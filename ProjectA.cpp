@@ -104,8 +104,8 @@ void alarmPWM(void)
 {
   if(((Vout<0.25)||(Vout>2.65))&&(!triggered))
   {
-   printf("alarm triggered");
-   printf(triggered);
+   //printf("alarm triggered\n");
+   //printf("%d\n", triggered);
    triggered = true;
    double PWMVout=(Light/(double)1023)*Humidity;
    pwmWrite(1,PWMVout);
@@ -126,11 +126,11 @@ int main () {
 }
 
 void readTime(void){
-	printf("reading time");
+	printf("reading time\n");
 	LEDStartTime=wiringPiI2CReadReg8(RTC, MIN); 
-	printf(MM);
-	printf(LEDStartTime+1);
-	printf("LEDStartTIme %d", LEDStartTime);
+	//printf("current minute %d\n",MM);
+	//printf("end minute %d\n", (LEDStartTime+1));
+	//printf("LEDStartTIme %d\n", LEDStartTime);
 	if (MM==(LEDStartTime+1)){
         	triggered=false;
 		printf("min elapsed");
