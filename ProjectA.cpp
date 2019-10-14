@@ -31,6 +31,7 @@ double TableHumidity;
 double TableLight;
 bool start=false;
 int HH,MM,SS;
+int LEDStartTime;
 const char RTCAddr = 0x6f;
 const char SEC = 0x00; // see register table in datasheet
 const char MIN = 0x01;
@@ -43,6 +44,9 @@ int d;
 int mode=1;
 void freqfunc (void);
 int VoutAlarm;
+bool triggered=false;
+void readTime(void);
+
 
 void initGPIO(void){
 // Sets GPIO using wiringPi pins. see pinout.xyz for specific wiringPi pi
@@ -55,7 +59,9 @@ void initGPIO(void){
 		pinMode(BTNS[j], INPUT);
 		pullUpDnControl(BTNS[j], PUD_UP);
 	}
-	pinMode(1, OUTPUT);
+// alarm LED SET TO HIGH initially
+	pinMode(1, PWM_OUTPUT);
+	pwmWrite(1,0);
 	wiringPiISR (27, INT_EDGE_FALLING,startRTC); // setting up interupt for button to call method hourInc.
 	wiringPiISR (26, INT_EDGE_FALLING,resetfunc);
 	wiringPiISR (28, INT_EDGE_FALLING,freqfunc);
@@ -66,7 +72,6 @@ void initGPIO(void){
 
 //set up ADC
 void setUpADC(){
-    
     mcp3004Setup(BASE,SPI_CHAN);
     wiringPiSPISetup(0,500000);
 
@@ -84,13 +89,10 @@ void readADC(){
 void CalcVout()
 {
   Vout =((Light/(double)1023)*(Humidity/(double)1023))*3.3;
-
 }//end calc Vout
 
 
 void TableValues(){
-	//temp
-	
 	TableTemp = (((Temp/(double)1023)*3.3)-0.5)/(double)0.1;
 	TableHumidity = (Humidity/(double)1023)*3.3;
 	TableLight= Light;
@@ -100,18 +102,16 @@ void TableValues(){
 // PWM for alarm
 void alarmPWM(void)
 {
-  if((Vout<0.25)||(Vout>2.65))
-  {double PWMVout=(Light/(double)1023)*Humidity;
-   pinMode(1,PWM_OUTPUT);
+  if(((Vout<0.25)||(Vout>2.65))&&(!triggered))
+  {
+   printf("alarm triggered");
+   printf(triggered);
+   triggered = true;
+   double PWMVout=(Light/(double)1023)*Humidity;
    pwmWrite(1,PWMVout);
+   readTime();
    printf("PWMVout is: %2f\n",PWMVout);
-   for (int i=0;i<10;i++)
-    {
-          delay(1000);
-          digitalWrite(1,LOW);
-     }
-	
-  }
+   }
 }
 
 int main () {
@@ -125,6 +125,19 @@ int main () {
 	}
 }
 
+void readTime(void){
+	printf("reading time");
+	LEDStartTime=wiringPiI2CReadReg8(RTC, MIN); 
+	printf(MM);
+	printf(LEDStartTime+1);
+	printf("LEDStartTIme %d", LEDStartTime);
+	if (MM==(LEDStartTime+1)){
+        	triggered=false;
+		printf("min elapsed");
+        }
+	
+
+}
 void resetfunc (void){
 long interruptTime = millis();
  if (interruptTime - lastInterruptTime>250){
@@ -134,6 +147,7 @@ long interruptTime = millis();
     wiringPiI2CWriteReg8(RTC, SEC, 0x80);
     mode=1;
     d=1000;
+    //triggered=false;
     printf("%x:%x:%x\n", HH, MM, SS); //} end for loop
   } // end dounounce if
  lastInterruptTime = interruptTime;
@@ -204,26 +218,11 @@ for(;;)
 lastInterruptTime = interruptTime;
 }
 
-/*void alarm (void)
-{
-long interruptTime = millis();
-if(interrputTime - lastInterrputTime>250)
-{
-  printf ("alarm triggered");  
-  // start sensing
-  printf("dismiss alarm");
-  digitalWrite(1, LOW);
-
-}// end longof if statement
-lastInterruptTime = interruptTime;
-}//end of alarm*/
-
 void alarm(){
 	long interruptTime = millis();
 	if (interruptTime - lastInterruptTime>250){
 		printf("dismiss alarm");
-		digitalWrite(1, LOW);
-	
+		pwmWrite(1,0);
 	}//end iff
 	lastInterruptTime=interruptTime;
 }
